@@ -5,6 +5,7 @@ export interface BrandStrategy {
   layoutStyle: string;
   reasoning: string;
   refinedPrompt: string;
+  featuredProduct: string;
 }
 
 export interface GenerationResult {
@@ -34,9 +35,16 @@ export interface BrandProfile {
   visualStyle: string;
   productDescription: string;
   styleReferenceImages: ReferenceImage[];
+  // Google Drive Integration
+  googleDriveClientId?: string;
+  autoUploadToDrive: boolean;
 }
 
 declare global {
+  interface Window {
+    google: any;
+    gapi: any;
+  }
   interface AIStudio {
     hasSelectedApiKey: () => Promise<boolean>;
     openSelectKey: () => Promise<void>;

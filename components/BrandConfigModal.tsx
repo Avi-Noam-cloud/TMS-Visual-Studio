@@ -1,10 +1,11 @@
 
 import React, { useState, useRef } from 'react';
-import { X, Save, RotateCcw, Image as ImageIcon, Sparkles, Trash2, Upload } from 'lucide-react';
+import { X, Save, RotateCcw, Image as ImageIcon, Sparkles, Trash2, Upload, Cloud, Link2 } from 'lucide-react';
 import { BrandProfile, ReferenceImage } from '../types';
 import { Button } from './Button';
 import { DEFAULT_BRAND_PROFILE } from '../constants';
 import { analyzeBrandAssets } from '../services/geminiService';
+import { requestDrivePermission, initDriveAuth } from '../services/driveService';
 
 interface BrandConfigModalProps {
   isOpen: boolean;
@@ -16,6 +17,7 @@ interface BrandConfigModalProps {
 export const BrandConfigModal: React.FC<BrandConfigModalProps> = ({ isOpen, onClose, profile, onSave }) => {
   const [formData, setFormData] = useState<BrandProfile>(profile);
   const [isAnalyzing, setIsAnalyzing] = useState(false);
+  const [driveStatus, setDriveStatus] = useState<'idle' | 'connecting' | 'connected' | 'error'>('idle');
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   if (!isOpen) return null;
@@ -23,6 +25,11 @@ export const BrandConfigModal: React.FC<BrandConfigModalProps> = ({ isOpen, onCl
   const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) => {
     const { name, value } = e.target;
     setFormData(prev => ({ ...prev, [name]: value }));
+  };
+  
+  const handleToggle = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const { name, checked } = e.target;
+    setFormData(prev => ({ ...prev, [name]: checked }));
   };
 
   const handleReset = () => {
@@ -85,6 +92,24 @@ export const BrandConfigModal: React.FC<BrandConfigModalProps> = ({ isOpen, onCl
       setIsAnalyzing(false);
     }
   };
+  
+  const handleConnectDrive = async () => {
+    if (!formData.googleDriveClientId) {
+      alert("Please enter a Client ID first.");
+      return;
+    }
+    
+    // Re-init with current client ID
+    initDriveAuth(formData.googleDriveClientId);
+    
+    setDriveStatus('connecting');
+    const success = await requestDrivePermission();
+    if (success) {
+        setDriveStatus('connected');
+    } else {
+        setDriveStatus('error');
+    }
+  };
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
@@ -98,8 +123,8 @@ export const BrandConfigModal: React.FC<BrandConfigModalProps> = ({ isOpen, onCl
         
         <div className="p-6 border-b border-brand-brown/10 flex justify-between items-center bg-brand-cream/30 sticky top-0 z-10">
           <div>
-            <h2 className="font-serif text-2xl text-brand-brown">Brand Identity & Training</h2>
-            <p className="text-brand-gray text-xs font-sans uppercase tracking-wider">Embed your visual language</p>
+            <h2 className="font-serif text-2xl text-brand-brown">Brand & Integrations</h2>
+            <p className="text-brand-gray text-xs font-sans uppercase tracking-wider">Configure identity and exports</p>
           </div>
           <button onClick={onClose} className="text-brand-gray hover:text-brand-brown">
             <X size={24} />
@@ -173,65 +198,114 @@ export const BrandConfigModal: React.FC<BrandConfigModalProps> = ({ isOpen, onCl
             </div>
           </div>
 
-          {/* Right Column: Text Configuration */}
-          <div className="space-y-4">
-            <div>
-              <label className="block text-xs font-bold uppercase tracking-wider text-brand-gray mb-1">Brand Name</label>
-              <input
-                type="text"
-                name="name"
-                value={formData.name}
-                onChange={handleChange}
-                className="w-full p-2 border border-brand-brown/20 rounded-sm font-sans focus:border-brand-gold outline-none"
-              />
-            </div>
-
-            <div className="grid grid-cols-2 gap-4">
-               <div>
-                <label className="block text-xs font-bold uppercase tracking-wider text-brand-gray mb-1">Tone</label>
+          {/* Right Column: Text Configuration & Drive */}
+          <div className="space-y-6">
+            <div className="space-y-4">
+                <div>
+                <label className="block text-xs font-bold uppercase tracking-wider text-brand-gray mb-1">Brand Name</label>
                 <input
-                  type="text"
-                  name="tone"
-                  value={formData.tone}
-                  onChange={handleChange}
-                  className="w-full p-2 border border-brand-brown/20 rounded-sm font-sans focus:border-brand-gold outline-none"
+                    type="text"
+                    name="name"
+                    value={formData.name}
+                    onChange={handleChange}
+                    className="w-full p-2 border border-brand-brown/20 rounded-sm font-sans focus:border-brand-gold outline-none"
                 />
-              </div>
-              <div>
-                <label className="block text-xs font-bold uppercase tracking-wider text-brand-gray mb-1">Colors</label>
-                <input
-                  type="text"
-                  name="colors"
-                  value={formData.colors}
-                  onChange={handleChange}
-                  className="w-full p-2 border border-brand-brown/20 rounded-sm font-sans focus:border-brand-gold outline-none"
+                </div>
+
+                <div className="grid grid-cols-2 gap-4">
+                <div>
+                    <label className="block text-xs font-bold uppercase tracking-wider text-brand-gray mb-1">Tone</label>
+                    <input
+                    type="text"
+                    name="tone"
+                    value={formData.tone}
+                    onChange={handleChange}
+                    className="w-full p-2 border border-brand-brown/20 rounded-sm font-sans focus:border-brand-gold outline-none"
+                    />
+                </div>
+                <div>
+                    <label className="block text-xs font-bold uppercase tracking-wider text-brand-gray mb-1">Colors</label>
+                    <input
+                    type="text"
+                    name="colors"
+                    value={formData.colors}
+                    onChange={handleChange}
+                    className="w-full p-2 border border-brand-brown/20 rounded-sm font-sans focus:border-brand-gold outline-none"
+                    />
+                </div>
+                </div>
+
+                <div>
+                <label className="block text-xs font-bold uppercase tracking-wider text-brand-gray mb-1 flex items-center justify-between">
+                    <span>Visual Style</span>
+                    <span className="text-[10px] font-normal text-green-600 bg-green-50 px-2 rounded-full">{formData.visualStyle.length} chars</span>
+                </label>
+                <textarea
+                    name="visualStyle"
+                    value={formData.visualStyle}
+                    onChange={handleChange}
+                    rows={4}
+                    className="w-full p-2 border border-brand-brown/20 rounded-sm font-sans focus:border-brand-gold outline-none resize-none bg-yellow-50/50 text-sm leading-relaxed"
                 />
-              </div>
+                </div>
+
+                <div>
+                <label className="block text-xs font-bold uppercase tracking-wider text-brand-gray mb-1">Product Details</label>
+                <textarea
+                    name="productDescription"
+                    value={formData.productDescription}
+                    onChange={handleChange}
+                    rows={3}
+                    className="w-full p-2 border border-brand-brown/20 rounded-sm font-sans focus:border-brand-gold outline-none resize-none text-sm leading-relaxed"
+                />
+                </div>
             </div>
 
-            <div>
-              <label className="block text-xs font-bold uppercase tracking-wider text-brand-gray mb-1 flex items-center justify-between">
-                <span>Visual Style</span>
-                <span className="text-[10px] font-normal text-green-600 bg-green-50 px-2 rounded-full">{formData.visualStyle.length} chars</span>
-              </label>
-              <textarea
-                name="visualStyle"
-                value={formData.visualStyle}
-                onChange={handleChange}
-                rows={5}
-                className="w-full p-2 border border-brand-brown/20 rounded-sm font-sans focus:border-brand-gold outline-none resize-none bg-yellow-50/50 text-sm leading-relaxed"
-              />
-            </div>
-
-            <div>
-              <label className="block text-xs font-bold uppercase tracking-wider text-brand-gray mb-1">Product Details</label>
-              <textarea
-                name="productDescription"
-                value={formData.productDescription}
-                onChange={handleChange}
-                rows={4}
-                className="w-full p-2 border border-brand-brown/20 rounded-sm font-sans focus:border-brand-gold outline-none resize-none text-sm leading-relaxed"
-              />
+            {/* Google Drive Integration */}
+            <div className="border-t border-brand-brown/10 pt-4">
+                 <h3 className="text-sm font-bold uppercase tracking-wider text-brand-brown mb-4 flex items-center gap-2">
+                    <Cloud size={16} /> Google Drive Export
+                 </h3>
+                 <div className="space-y-3 bg-gray-50 p-4 rounded-sm border border-brand-brown/5">
+                     <div>
+                         <label className="block text-xs font-bold text-brand-gray mb-1">OAuth 2.0 Client ID</label>
+                         <input 
+                            type="text"
+                            name="googleDriveClientId"
+                            value={formData.googleDriveClientId || ''}
+                            onChange={handleChange}
+                            placeholder="e.g. 123456-abcde.apps.googleusercontent.com"
+                            className="w-full p-2 border border-brand-brown/20 rounded-sm font-mono text-xs focus:border-brand-gold outline-none"
+                         />
+                         <p className="text-[10px] text-brand-gray mt-1">Required to upload files to your Drive.</p>
+                     </div>
+                     
+                     <div className="flex items-center justify-between">
+                         <div className="flex items-center gap-2">
+                             <input 
+                                type="checkbox"
+                                id="autoUploadToDrive"
+                                name="autoUploadToDrive"
+                                checked={formData.autoUploadToDrive}
+                                onChange={handleToggle}
+                                className="accent-brand-gold w-4 h-4"
+                             />
+                             <label htmlFor="autoUploadToDrive" className="text-sm text-brand-brown font-medium">Auto-upload when downloading</label>
+                         </div>
+                         <Button 
+                           type="button" 
+                           onClick={handleConnectDrive} 
+                           variant={driveStatus === 'connected' ? 'primary' : 'outline'}
+                           className="py-1 px-3 text-xs"
+                           disabled={!formData.googleDriveClientId}
+                         >
+                            {driveStatus === 'connected' ? 'Connected' : driveStatus === 'connecting' ? 'Connecting...' : 'Connect'}
+                         </Button>
+                     </div>
+                     {driveStatus === 'connected' && (
+                         <p className="text-[10px] text-green-600 flex items-center gap-1"><Link2 size={10}/> Drive connected successfully</p>
+                     )}
+                 </div>
             </div>
           </div>
 
